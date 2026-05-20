@@ -32,17 +32,17 @@ app.post("/webhook", line.middleware(config), async (req, res) => {
       let total = 0;
       let feeText = "";
 
-      // 2500 以下 +230
+      // 2500 以下 +240
       if (twd <= 2500) {
 
-        total = twd + 230;
+        total = twd + 240;
 
-        feeText = `${Math.round(twd)} + 230`;
+        feeText = `${Math.round(twd)} + 240`;
 
       } else {
 
-        // 2500 以上 +18%
-        const fee = twd * 0.18;
+        // 2500 以上 +15%
+        const fee = twd * 0.15;
 
         total = twd + fee;
 
