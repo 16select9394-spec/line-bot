@@ -46,7 +46,7 @@ app.post("/webhook", line.middleware(config), async (req, res) => {
 
         total = twd + fee;
 
-        feeText = `${Math.round(twd)} + ${Math.round(fee)} (18%)`;
+        feeText = `${Math.round(twd)} + ${Math.round(fee)} (15%)`;
       }
 
       // 營業稅
