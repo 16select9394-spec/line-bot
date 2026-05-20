@@ -68,7 +68,8 @@ app.post("/webhook", line.middleware(config), async (req, res) => {
 
 ────────
 
-最終價格：NT$${finalTotal}`;
+估算盈利
+${Math.round(total - twd)}-${tax}=${Math.round((total - twd) - tax)}
 
       await client.replyMessage({
         replyToken: event.replyToken,
