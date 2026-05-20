@@ -49,27 +49,23 @@ app.post("/webhook", line.middleware(config), async (req, res) => {
         feeText = `${Math.round(twd)} + ${Math.round(fee)} (18%)`;
       }
 
-      // 稅金
+      // 營業稅
       const tax = Math.round(total * 0.05);
 
-      // 最終價格
-      const finalTotal = Math.round(total + tax);
+      // 估算盈利
+      const profit = Math.round((total - twd) - tax);
 
       const replyText =
 `1.韓幣：₩${krw.toLocaleString()}
-
 2.換算台幣：NT$${Math.round(twd)}
-
 3.${feeText}
-
 4.總金額：NT$${Math.round(total)}
-
 5.營業稅5%：NT$${tax}
 
 ────────
 
 估算盈利
-${Math.round(total - twd)}-${tax}=${Math.round((total - twd) - tax)}`;
+${Math.round(total - twd)}-${tax}=${profit}`;
 
       await client.replyMessage({
         replyToken: event.replyToken,
