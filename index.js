@@ -5,12 +5,16 @@ require("dotenv").config();
 
 const app = express();
 
-// 讀取設定檔
+app.use(express.json());
+
+// =========================
+// 設定檔
+// =========================
+
 function getSettings() {
   return JSON.parse(fs.readFileSync("settings.json", "utf8"));
 }
 
-// 儲存設定檔
 function saveSettings(settings) {
   fs.writeFileSync(
     "settings.json",
@@ -19,7 +23,10 @@ function saveSettings(settings) {
   );
 }
 
-// LINE 設定
+// =========================
+// LINE
+// =========================
+
 const config = {
   channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN,
   channelSecret: process.env.CHANNEL_SECRET,
@@ -28,60 +35,84 @@ const config = {
 const client = new line.messagingApi.MessagingApiClient({
   channelAccessToken: config.channelAccessToken,
 });
+
+// =========================
+// 工具
+// =========================
+
+function formatNumber(num) {
+  return Number(num).toLocaleString("zh-TW");
+}
+
+function calculateKRW(krw) {
+  const settings = getSettings();
+
+  const rate = settings.rate;
+
+  const twd = Math.round(krw / rate);
+
+  let fee = 0;
+  let feeText = "";
+
+  if (twd <= 2500) {
+    fee = 240;
+    feeText = "NT$240";
+  } else {
+    fee = Math.round(twd * 0.15);
+    feeText = `NT$${formatNumber(fee)}（15%）`;
+  }
+
+  const total = twd + fee;
+
+  const tax = Math.round(total * 0.05);
+
+  const profit = fee - tax;
+
+  return {
+    rate,
+    krw,
+    twd,
+    fee,
+    feeText,
+    total,
+    tax,
+    profit,
+  };
+}
+
+// =========================
+// 健康檢查
+// =========================
+
+app.get("/", (req, res) => {
+  res.send("LINE BOT OK");
+});
+
 // =========================
 // Webhook
 // =========================
 
 app.post("/webhook", line.middleware(config), async (req, res) => {
+  try {
+    const events = req.body.events || [];
 
-  const events = req.body.events;
+    for (const event of events) {
+      if (event.type !== "message") continue;
+      if (event.message.type !== "text") continue;
 
-  for (const event of events) {
+      const msg = event.message.text.trim();
 
-    if (event.type !== "message") continue;
-    if (event.message.type !== "text") continue;
+      // =====================
+      // 健康測試
+      // =====================
 
-    const msg = event.message.text.trim();
-
-    // =====================
-    // 查看目前匯率
-    // =====================
-
-    if (msg === "/匯率") {
-
-      const settings = getSettings();
-
-      await client.replyMessage({
-        replyToken: event.replyToken,
-        messages: [
-          {
-            type: "text",
-            text: `目前匯率：${settings.rate}`,
-          },
-        ],
-      });
-
-      continue;
-    }
-
-    // =====================
-    // 修改匯率
-    // =====================
-
-    if (msg.startsWith("/匯率 ")) {
-
-      const rate = Number(
-        msg.replace("/匯率", "").trim()
-      );
-
-      if (!rate || rate <= 0) {
-
+      if (msg === "/健康") {
         await client.replyMessage({
           replyToken: event.replyToken,
           messages: [
             {
               type: "text",
-              text: "❌ 匯率格式錯誤",
+              text: "✅ Bot 正常運作",
             },
           ],
         });
@@ -89,65 +120,99 @@ app.post("/webhook", line.middleware(config), async (req, res) => {
         continue;
       }
 
-      const settings = getSettings();
+      // =====================
+      // 查看匯率
+      // =====================
 
-      settings.rate = rate;
-
-      saveSettings(settings);
-
-      await client.replyMessage({
-        replyToken: event.replyToken,
-        messages: [
-          {
-            type: "text",
-            text: `✅ 已更新匯率：${rate}`,
-          },
-        ],
-      });
-
-      continue;
-    }
-    // =====================
-    // 韓幣試算
-    // =====================
-
-    if (msg.startsWith("+")) {
-
-      // 支援：
-      // +29900
-      // +29900+12000
-      // +29,900 + 12,000
-
-      const numbers = msg
-        .replace(/\s/g, "")
-        .substring(1)
-        .split("+")
-        .map(n => n.replace(/,/g, ""));
-
-      if (numbers.some(n => !/^\d+$/.test(n))) {
+      if (msg === "/匯率") {
+        const settings = getSettings();
 
         await client.replyMessage({
           replyToken: event.replyToken,
-          messages: [{
-            type: "text",
-            text: "❌ 請輸入正確格式，例如：\n+29900\n+29900+12000"
-          }]
+          messages: [
+            {
+              type: "text",
+              text: `目前匯率：${settings.rate}`,
+            },
+          ],
         });
 
         continue;
       }
 
-      const krw = numbers
-        .map(Number)
-        .reduce((a, b) => a + b, 0);
+      // =====================
+      // 修改匯率
+      // =====================
 
-      const result = calculateKRW(krw);
+      if (msg.startsWith("/匯率 ")) {
+        const rate = Number(msg.replace("/匯率", "").trim());
 
-      const profitText =
-`${result.fee}-${result.tax}=${result.profit}`;
+        if (!rate || rate <= 0) {
+          await client.replyMessage({
+            replyToken: event.replyToken,
+            messages: [
+              {
+                type: "text",
+                text: "❌ 匯率格式錯誤",
+              },
+            ],
+          });
 
-      const replyText =
-`1.韓幣：₩${formatNumber(krw)}
+          continue;
+        }
+
+        const settings = getSettings();
+        settings.rate = rate;
+        saveSettings(settings);
+
+        await client.replyMessage({
+          replyToken: event.replyToken,
+          messages: [
+            {
+              type: "text",
+              text: `✅ 已更新匯率：${rate}`,
+            },
+          ],
+        });
+
+        continue;
+      }
+
+      // =====================
+      // 韓幣試算
+      // =====================
+
+      if (msg.startsWith("+")) {
+        const numbers = msg
+          .replace(/\s/g, "")
+          .substring(1)
+          .split("+")
+          .map((n) => n.replace(/,/g, ""));
+
+        if (
+          numbers.length === 0 ||
+          numbers.some((n) => !/^\d+$/.test(n))
+        ) {
+          await client.replyMessage({
+            replyToken: event.replyToken,
+            messages: [
+              {
+                type: "text",
+                text: "❌ 請輸入正確格式，例如：\n+29900\n+29900+12000",
+              },
+            ],
+          });
+
+          continue;
+        }
+
+        const krw = numbers
+          .map(Number)
+          .reduce((a, b) => a + b, 0);
+
+        const result = calculateKRW(krw);
+
+        const replyText = `1.韓幣：₩${formatNumber(result.krw)}
 2.目前匯率：${result.rate}
 3.換算台幣：NT$${formatNumber(result.twd)}
 4.代購費：${result.feeText}
@@ -156,28 +221,40 @@ app.post("/webhook", line.middleware(config), async (req, res) => {
 ────────
 
 估算盈利
-${profitText}
+${formatNumber(result.fee)}-${formatNumber(result.tax)}=${formatNumber(result.profit)}
 
 ────────
 
 總金額：NT$${formatNumber(result.total)}`;
 
-      await client.replyMessage({
-        replyToken: event.replyToken,
-        messages: [{
-          type: "text",
-          text: replyText
-        }]
-      });
+        await client.replyMessage({
+          replyToken: event.replyToken,
+          messages: [
+            {
+              type: "text",
+              text: replyText,
+            },
+          ],
+        });
 
-      continue;
+        continue;
+      }
     }
 
+    return res.sendStatus(200);
+  } catch (err) {
+    console.error(err);
+
+    return res.sendStatus(500);
   }
-
-  res.sendStatus(200);
-
 });
-app.listen(process.env.PORT || 3000, () => {
-  console.log("Bot is running");
+
+// =========================
+// 啟動
+// =========================
+
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log(`Bot is running on port ${PORT}`);
 });
