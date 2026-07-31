@@ -159,44 +159,61 @@ app.post("/webhook", line.middleware(config), async (req, res) => {
         continue;
       }
 
-      // =====================
-      // 修改匯率
-      // =====================
+ // =====================
+// 修改匯率
+// =====================
 
-      if (msg.startsWith("/匯率 ")) {
-        const rate = Number(msg.replace("/匯率", "").trim());
+if (msg.startsWith("/匯率 ")) {
 
-        if (!rate || rate <= 0) {
-          await client.replyMessage({
-            replyToken: event.replyToken,
-            messages: [
-              {
-                type: "text",
-                text: "❌ 匯率格式錯誤",
-              },
-            ],
-          });
+  console.log("====== 修改匯率 ======");
+  console.log("原始訊息：", JSON.stringify(msg));
 
-          continue;
-        }
+  const text = msg.replace("/匯率", "").trim();
 
-        const settings = getSettings();
-        settings.rate = rate;
-        saveSettings(settings);
+  console.log("解析後：", JSON.stringify(text));
 
-        await client.replyMessage({
-          replyToken: event.replyToken,
-          messages: [
-            {
-              type: "text",
-              text: `✅ 已更新匯率：${rate}`,
-            },
-          ],
-        });
+  const rate = Number(text);
 
-        continue;
-      }
+  console.log("rate =", rate);
 
+  if (isNaN(rate) || rate <= 0) {
+    await client.replyMessage({
+      replyToken: event.replyToken,
+      messages: [
+        {
+          type: "text",
+          text: "❌ 匯率格式錯誤",
+        },
+      ],
+    });
+
+    continue;
+  }
+
+  const settings = getSettings();
+
+  console.log("修改前：", settings);
+
+  settings.rate = rate;
+
+  saveSettings(settings);
+
+  console.log("修改後：", settings);
+
+  await client.replyMessage({
+    replyToken: event.replyToken,
+    messages: [
+      {
+        type: "text",
+        text: `✅ 已更新匯率：${rate}`,
+      },
+    ],
+  });
+
+  console.log("已回覆修改成功");
+
+  continue;
+}
       // =====================
       // 韓幣試算
       // =====================
