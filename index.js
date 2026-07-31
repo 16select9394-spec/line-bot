@@ -96,16 +96,32 @@ app.post("/webhook", line.middleware(config), async (req, res) => {
     const events = req.body.events || [];
 
     for (const event of events) {
-      if (event.type !== "message") continue;
-      if (event.message.type !== "text") continue;
+
+      console.log("========== 收到 Event ==========");
+      console.log(JSON.stringify(event, null, 2));
+
+      if (event.type !== "message") {
+        console.log("不是 message event");
+        continue;
+      }
+
+      if (event.message.type !== "text") {
+        console.log("不是文字訊息");
+        continue;
+      }
 
       const msg = event.message.text.trim();
+
+      console.log("收到文字：", msg);
 
       // =====================
       // 健康測試
       // =====================
 
       if (msg === "/健康") {
+
+        console.log("進入 /健康");
+
         await client.replyMessage({
           replyToken: event.replyToken,
           messages: [
@@ -116,9 +132,10 @@ app.post("/webhook", line.middleware(config), async (req, res) => {
           ],
         });
 
+        console.log("/健康 已回覆");
+
         continue;
       }
-
       // =====================
       // 查看匯率
       // =====================
