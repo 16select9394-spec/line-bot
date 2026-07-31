@@ -1,6 +1,7 @@
 const express = require("express");
 const line = require("@line/bot-sdk");
 const fs = require("fs");
+const path = require("path");
 require("dotenv").config();
 
 const app = express();
@@ -10,13 +11,15 @@ const app = express();
 // 設定檔
 // =========================
 
+const SETTINGS_FILE = path.join(__dirname, "settings.json");
+
 function getSettings() {
-  return JSON.parse(fs.readFileSync("settings.json", "utf8"));
+  return JSON.parse(fs.readFileSync(SETTINGS_FILE, "utf8"));
 }
 
 function saveSettings(settings) {
   fs.writeFileSync(
-    "settings.json",
+    SETTINGS_FILE,
     JSON.stringify(settings, null, 2),
     "utf8"
   );
