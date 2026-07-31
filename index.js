@@ -3,26 +3,35 @@ const line = require("@line/bot-sdk");
 const fs = require("fs");
 const path = require("path");
 require("dotenv").config();
+const { createClient } = require("@supabase/supabase-js");
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_ANON_KEY
+);
 
 const app = express();
 
 
-// =========================
-// 設定檔
-// =========================
+async function getRate() {
+  const { data, error } = await supabase
+    .from("settings")
+    .select("value")
+    .eq("key", "rate")
+    .single();
 
-const SETTINGS_FILE = path.join(__dirname, "settings.json");
+  if (error) throw error;
 
-function getSettings() {
-  return JSON.parse(fs.readFileSync(SETTINGS_FILE, "utf8"));
+  return Number(data.value);
 }
 
-function saveSettings(settings) {
-  fs.writeFileSync(
-    SETTINGS_FILE,
-    JSON.stringify(settings, null, 2),
-    "utf8"
-  );
+async function setRate(rate) {
+  const { error } = await supabase
+    .from("settings")
+    .update({ value: String(rate) })
+    .eq("key", "rate");
+
+  if (error) throw error;
 }
 
 // =========================
@@ -46,10 +55,8 @@ function formatNumber(num) {
   return Number(num).toLocaleString("zh-TW");
 }
 
-function calculateKRW(krw) {
-  const settings = getSettings();
-
-  const rate = settings.rate;
+async function calculateKRW(krw) {
+  const rate = await getRate();
 
   const twd = Math.round(krw / rate);
 
@@ -144,17 +151,17 @@ app.post("/webhook", line.middleware(config), async (req, res) => {
       // =====================
 
       if (msg === "/匯率") {
-        const settings = getSettings();
+const rate = await getRate();
 
-        await client.replyMessage({
-          replyToken: event.replyToken,
-          messages: [
-            {
-              type: "text",
-              text: `目前匯率：${settings.rate}`,
-            },
-          ],
-        });
+await client.replyMessage({
+  replyToken: event.replyToken,
+  messages: [
+    {
+      type: "text",
+      text: `目前匯率：${rate}`,
+    },
+  ],
+});
 
         continue;
       }
@@ -190,15 +197,9 @@ if (msg.startsWith("/匯率 ")) {
     continue;
   }
 
-  const settings = getSettings();
+await setRate(rate);
 
-  console.log("修改前：", settings);
-
-  settings.rate = rate;
-
-  saveSettings(settings);
-
-  console.log("修改後：", settings);
+console.log("已更新資料庫匯率：", rate);
 
   await client.replyMessage({
     replyToken: event.replyToken,
@@ -246,7 +247,7 @@ if (msg.startsWith("/匯率 ")) {
           .map(Number)
           .reduce((a, b) => a + b, 0);
 
-        const result = calculateKRW(krw);
+        const result = await calculateKRW(krw);
 
         const replyText = `1.韓幣：₩${formatNumber(result.krw)}
 2.目前匯率：${result.rate}
